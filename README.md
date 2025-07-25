@@ -1,56 +1,44 @@
-# pyafipws_endpoint_eureka
+# pyafipws_endpoint_consul
 
 [![Build and Push Docker Image](https://github.com/dqmdz/pyafipws_endpoint_eureka/actions/workflows/deploy.yml/badge.svg)](https://github.com/dqmdz/pyafipws_endpoint_eureka/actions/workflows/deploy.yml)
+<<<<<<< HEAD
 
 forked
 
 [![Build and Push Docker Image](https://github.com/ETEREA-services/ETEREA.pyafipws-ct-service/actions/workflows/deploy.yml/badge.svg)](https://github.com/ETEREA-services/ETEREA.pyafipws-ct-service/actions/workflows/deploy.yml)
+=======
+[![Python 3.13](https://img.shields.io/badge/python-3.13-blue.svg)](https://www.python.org/downloads/release/python-3130/)
+[![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/release/python-3120/)
+>>>>>>> 6150de43ebb469bd8b5ab6c559f726db781d55a1
 [![Python 3.11](https://img.shields.io/badge/python-3.11-blue.svg)](https://www.python.org/downloads/release/python-3110/)
 [![Flask 3.0.1](https://img.shields.io/badge/flask-3.0.1-green.svg)](https://flask.palletsprojects.com/)
 [![pyafipws v2025.05.05](https://img.shields.io/badge/pyafipws-v2025.05.05-orange.svg)](https://github.com/dqmdz/pyafipws)
 [![Docker](https://img.shields.io/badge/docker-latest-blue.svg)](https://www.docker.com/)
 [![License](https://img.shields.io/badge/license-GPL%203.0-yellow.svg)](https://www.gnu.org/licenses/gpl-3.0)
 
-Servicio REST basado en [pyafipws v2025.05.05](https://github.com/dqmdz/pyafipws) para la emisión de comprobantes electrónicos AFIP (Argentina) con integración a Eureka Service Discovery.
+Servicio REST basado en [pyafipws v2025.05.05](https://github.com/dqmdz/pyafipws) para la emisión de comprobantes electrónicos AFIP (Argentina) con integración a Consul Service Discovery.
 
-## Características
-
-- Emisión de comprobantes electrónicos AFIP (Facturas, Notas de Crédito/Débito)
-- Integración con Eureka Service Discovery
-- API REST con Flask 3.0.1
 - **Documentación automática con Swagger/OpenAPI**
-- **Observabilidad con OpenTelemetry** (trazas, métricas y logs)
-- **Integración con Jaeger + Elasticsearch** para monitoreo distribuido
-- Contenedorización con Docker
-- Soporte para ambiente de homologación y producción
-- Logging mejorado y manejo de errores
-- Validación de datos de entrada
-- Soporte para comprobantes asociados
 
-## Requisitos
+# pyafipws_endpoint_consul
 
-- Python 3.11
+[![Build and Push Docker Image (Upstream)](https://github.com/dqmdz/pyafipws_endpoint_eureka/actions/workflows/deploy.yml/badge.svg)](https://github.com/dqmdz/pyafipws_endpoint_eureka/actions/workflows/deploy.yml)
+[![Build and Push Docker Image (Fork)](https://github.com/ETEREA-services/ETEREA.pyafipws-ct-service/actions/workflows/deploy.yml/badge.svg)](https://github.com/ETEREA-services/ETEREA.pyafipws-ct-service/actions/workflows/deploy.yml)
+[![Python 3.13](https://img.shields.io/badge/python-3.13-blue.svg)](https://www.python.org/downloads/release/python-3130/)
+[![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/release/python-3120/)
+[![Python 3.11](https://img.shields.io/badge/python-3.11-blue.svg)](https://www.python.org/downloads/release/python-3110/)
+[![Flask 3.0.1](https://img.shields.io/badge/flask-3.0.1-green.svg)](https://flask.palletsprojects.com/)
+[![pyafipws v2025.05.05](https://img.shields.io/badge/pyafipws-v2025.05.05-orange.svg)](https://github.com/dqmdz/pyafipws)
+[![Docker](https://img.shields.io/badge/docker-latest-blue.svg)](https://www.docker.com/)
+[![License](https://img.shields.io/badge/license-GPL%203.0-yellow.svg)](https://www.gnu.org/licenses/gpl-3.0)
+
+Servicio REST basado en [pyafipws v2025.05.05](https://github.com/dqmdz/pyafipws) para la emisión de comprobantes electrónicos AFIP (Argentina) con integración a Consul Service Discovery.
 - Docker y Docker Compose
 - Certificados AFIP válidos (`.crt` y `.key`)
 - CUIT válido para facturación
-- **Opcional**: Endpoint OpenTelemetry para observabilidad
-
-## Configuración
-
-1. Clonar el repositorio
-2. Copiar los certificados AFIP a la raíz del proyecto:
-   - `user.crt`
-   - `user.key`
-3. Configurar variables de entorno (opcional):
-   - `CUIT`: CUIT para facturación
-   - `CERT`: Ruta al certificado (default: user.crt)
    - `PRIVATEKEY`: Ruta a la clave privada (default: user.key)
    - `PRODUCTION`: TRUE/FALSE para ambiente de producción
-   - `EUREKA_PORT`: Puerto de Eureka (default: 8761)
-   - `INSTANCE_PORT`: Puerto del servicio (default: 5086)
-   - `CERT_DATE`: Fecha del certificado (default: 2019-01-01)
-   - **`OTEL_EXPORTER_OTLP_ENDPOINT`**: Endpoint OpenTelemetry para observabilidad (opcional)
-
+   - `CONSUL_HOST`: Host de Consul (default: consul-service)
 ## Uso
 
 ### Desarrollo local
@@ -127,6 +115,45 @@ Emite un comprobante electrónico.
 - `asociado_numero_comprobante`: Número de comprobante asociado
 - `asociado_fecha_comprobante`: Fecha del comprobante asociado
 
+### GET /api/afipws/consulta_comprobante
+
+Consulta un comprobante electrónico ya emitido.
+
+**Query Parameters:**
+- `tipo_cbte` (integer, required): Tipo de comprobante AFIP (ej. 6 para Factura B).
+- `punto_vta` (integer, required): Punto de venta (ej. 34).
+- `cbte_nro` (integer, required): Número del comprobante a consultar (ej. 100).
+
+**Respuesta Exitosa (200 OK):**
+```json
+{
+  "mensaje": "Comprobante encontrado.",
+  "factura": {
+    "concepto": 1,
+    "tipo_doc": 96,
+    "nro_doc": 28757428,
+    "tipo_cbte": 6,
+    "punto_vta": 34,
+    "cbt_desde": 100,
+    "cbt_hasta": 100,
+    "fecha_cbte": "20240126",
+    "imp_total": 20000.04,
+    "cae": "74049145150923",
+    "resultado": "A",
+    "fch_venc_cae": "20240205",
+    "...": "..."
+  }
+}
+```
+
+**Respuesta Comprobante No Encontrado (200 OK):**
+```json
+{
+  "mensaje": "602: No existen datos en nuestros registros para los parametros ingresados.",
+  "factura": null
+}
+```
+
 ### GET /api/afipws/test
 
 Endpoint de prueba para verificar el estado del servicio.
@@ -136,6 +163,9 @@ Endpoint de prueba para verificar el estado del servicio.
 ```bash
 # Probar el endpoint de test
 curl -X GET "http://localhost:5086/api/afipws/test"
+
+# Consultar un comprobante existente
+curl -X GET "http://localhost:5086/api/afipws/consulta_comprobante?tipo_cbte=6&punto_vta=34&cbte_nro=100"
 
 # Emitir una factura
 curl -X POST "http://localhost:5086/api/afipws/facturador" \
