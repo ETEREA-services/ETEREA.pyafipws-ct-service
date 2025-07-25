@@ -2,7 +2,7 @@ import json
 from flask import request
 from flask_restx import Namespace, Resource, fields
 from app.logger_setup import logger
-from app.factura_electronica import facturar
+from app.factura_electronica import facturar, consultar_comprobante
 from app.otel_setup import get_tracer
 from typing import Dict
 
@@ -51,6 +51,7 @@ factura_response_model = afipws_ns.model('FacturaResponse', {
     'cae': fields.String(description='Número de CAE'),
     'vencimiento_cae': fields.String(description='Fecha de vencimiento del CAE'),
     'numero_comprobante': fields.Integer(description='Número de comprobante'),
+    'fecha_comprobante': fields.String(description='Fecha del comprobante'),
     'asociado_tipo_afip': fields.Integer(description='Tipo de comprobante asociado'),
     'asociado_punto_venta': fields.Integer(description='Punto de venta del comprobante asociado'),
     'asociado_numero_comprobante': fields.Integer(description='Número de comprobante asociado'),
@@ -61,6 +62,17 @@ factura_response_model = afipws_ns.model('FacturaResponse', {
 test_response_model = afipws_ns.model('TestResponse', {
     'test': fields.String(description='Mensaje de prueba', example='ok')
 })
+
+consulta_parser = afipws_ns.parser()
+consulta_parser.add_argument('tipo_cbte', type=int, required=True, help='Tipo de comprobante AFIP', location='args')
+consulta_parser.add_argument('punto_vta', type=int, required=True, help='Punto de venta', location='args')
+consulta_parser.add_argument('cbte_nro', type=int, required=True, help='Número de comprobante', location='args')
+
+consulta_response_model = afipws_ns.model('ConsultaResponse', {
+    'mensaje': fields.String(description='Mensaje devuelto por AFIP'),
+    'factura': fields.Raw(description='Datos del comprobante consultado (si existe)', required=False)
+})
+
 
 @afipws_ns.route('/test')
 class TestResource(Resource):
@@ -78,6 +90,78 @@ class TestResource(Resource):
         else:
             logger.info("test")
             return {"test": "ok"}
+
+
+@afipws_ns.route('/consulta_comprobante')
+class ConsultaComprobanteResource(Resource):
+    @afipws_ns.doc('consultar_comprobante')
+    @afipws_ns.expect(consulta_parser)
+    @afipws_ns.marshal_with(consulta_response_model)
+    def get(self):
+        """Endpoint para consultar un comprobante electrónico AFIP."""
+        tracer = get_tracer()
+
+        if tracer:
+            with tracer.start_as_current_span("consulta_comprobante_endpoint") as span:
+                span.set_attribute("endpoint", "/consulta_comprobante")
+                span.set_attribute("method", "GET")
+
+                try:
+                    args = consulta_parser.parse_args()
+                    tipo_cbte = args['tipo_cbte']
+                    punto_vta = args['punto_vta']
+                    cbte_nro = args['cbte_nro']
+
+                    span.set_attribute("comprobante.tipo", tipo_cbte)
+                    span.set_attribute("comprobante.punto_vta", punto_vta)
+                    span.set_attribute("comprobante.cbte_nro", cbte_nro)
+
+                    logger.info(f"Consultando comprobante: tipo={tipo_cbte}, pto_vta={punto_vta}, nro={cbte_nro}")
+
+                    production = _afip_config.get('production', False)
+
+                    with tracer.start_as_current_span("consultar_comprobante_afip") as consulta_span:
+                        consulta_span.set_attribute("afip.production", production)
+                        result = consultar_comprobante(tipo_cbte, punto_vta, cbte_nro, production=production)
+
+                    logger.info(f"Resultado de la consulta: {result}")
+                    
+                    if result.get("factura") is None:
+                        # Comprobante no encontrado, pero la operación fue "exitosa" en el sentido de que no hubo un error de sistema.
+                        return result, 200
+                    
+                    return result
+
+                except Exception as e:
+                    span.set_attribute("error", str(e))
+                    span.set_attribute("error.type", type(e).__name__)
+                    logger.error(f'Error al consultar comprobante: {str(e)}')
+                    return {"mensaje": f"Error interno del servidor: {str(e)}", "factura": None}, 500
+        else:
+            # No tracer
+            try:
+                args = consulta_parser.parse_args()
+                tipo_cbte = args['tipo_cbte']
+                punto_vta = args['punto_vta']
+                cbte_nro = args['cbte_nro']
+
+                logger.info(f"Consultando comprobante: tipo={tipo_cbte}, pto_vta={punto_vta}, nro={cbte_nro}")
+
+                production = _afip_config.get('production', False)
+
+                result = consultar_comprobante(tipo_cbte, punto_vta, cbte_nro, production=production)
+
+                logger.info(f"Resultado de la consulta: {result}")
+
+                if result.get("factura") is None:
+                    return result, 200
+
+                return result
+
+            except Exception as e:
+                logger.error(f'Error al consultar comprobante: {str(e)}')
+                return {"mensaje": f"Error interno del servidor: {str(e)}", "factura": None}, 500
+
 
 @afipws_ns.route('/facturador')
 class FacturadorResource(Resource):
@@ -123,10 +207,6 @@ class FacturadorResource(Resource):
                     logger.info(f"Resultado final JSON: {json.dumps(result, indent=2)}")
                     logger.info(f"Tipos en resultado: {[(k, type(v)) for k, v in result.items()]}")
                     
-                    # Agregar atributos del resultado al span
-                    span.set_attribute("resultado.cae", result.get('cae', ''))
-                    span.set_attribute("resultado.numero_comprobante", result.get('numero_comprobante', 0))
-                    
                     return result
                     
                 except Exception as e:
@@ -161,6 +241,15 @@ class FacturadorResource(Resource):
             except Exception as e:
                 logger.error(f'Error al facturar: {str(e)}')
                 return {"success": False, "error": str(e)}, 500
+
+
+@afipws_ns.route('/health')
+class HealthResource(Resource):
+    @afipws_ns.doc('health_check')
+    def get(self):
+        """Endpoint de chequeo de salud para Consul."""
+        return {"status": "ok"}
+
 
 def register_routes(config: Dict, api):
     """Configura y registra las rutas con la API de Flask-RESTX."""
